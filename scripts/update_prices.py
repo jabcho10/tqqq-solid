@@ -8,6 +8,7 @@ python scripts/update_prices.py            # GitHub Actions에서 매일 실행
 """
 import os
 import sys
+import time
 
 import pandas as pd
 import yfinance as yf
@@ -17,13 +18,23 @@ TICKERS = {'tqqq': 'TQQQ', 'qqq': 'QQQ'}
 TOL = 0.011
 
 
+def download(tickers, start, tries=4):
+    """순차 다운로드(threads=False): 멀티스레드면 yfinance 캐시 DB가 잠겨 종목이 빠지는 일이 있다."""
+    for k in range(tries):
+        raw = yf.download(tickers, start=start, auto_adjust=False, actions=True, progress=False, threads=False)
+        ok = not raw.empty and all(t in raw['Close'].columns and raw['Close'][t].notna().any() for t in tickers)
+        if ok:
+            return raw
+        print(f'다운로드 불완전, 다시 시도 ({k + 1}/{tries})')
+        time.sleep(5 * (k + 1))
+    sys.exit('Yahoo에서 데이터를 받지 못함')
+
+
 def main():
     cur = pd.read_csv(CSV, parse_dates=['date']).set_index('date')
     last = cur.index.max()
     start = (last - pd.Timedelta(days=40)).strftime('%Y-%m-%d')
-    raw = yf.download(list(TICKERS.values()), start=start, auto_adjust=False, actions=True, progress=False)
-    if raw.empty:
-        sys.exit('Yahoo에서 데이터를 받지 못함')
+    raw = download(list(TICKERS.values()), start)
     raw.index = pd.to_datetime(raw.index).tz_localize(None).normalize()
 
     # 1) 분할 역보정: 분할일 이전(기존 CSV 포함) 가격을 비율로 나눈다
