@@ -698,6 +698,24 @@
     FILL_KEY = null; commit(evs);
   });
 
+  // 시세 출처 (docs/data/meta.json, 없으면 표시 안 함)
+  const SRC_NAME = { yahoo: 'Yahoo', nasdaq: 'Nasdaq', alphavantage: 'Alpha Vantage', google: 'Google', cnbc: 'CNBC' };
+  async function loadMeta(lastIso) {
+    try {
+      const res = await fetch('data/meta.json', { cache: 'no-cache' });
+      if (!res.ok) return;
+      const m = await res.json();
+      const row = (m.rows || []).filter(r => r.date === lastIso).pop();
+      const parts = [];
+      if (row) parts.push(`출처 ${SRC_NAME[row.source] || row.source}` + (row.checked && row.checked.length ? ` (교차 확인 ${row.checked.map(n => SRC_NAME[n] || n).join('·')})` : ''));
+      if (m.updated_at) {
+        const kst = new Date(Date.parse(m.updated_at) + 9 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+        parts.push(`갱신 ${kst} KST`);
+      }
+      if (parts.length) $('dataInfo').insertAdjacentHTML('beforeend', ` · <span class="src">${esc(parts.join(' · '))}</span>`);
+    } catch (e) { /* meta 없음 */ }
+  }
+
   // ───────── 시작 ─────────
   async function init() {
     let text;
@@ -717,6 +735,7 @@
     }
     const L = DATA.dates.length - 1;
     $('dataInfo').innerHTML = `시세 <b>${DATA.iso[0]} ~ ${DATA.iso[L]}</b> · ${DATA.dates.length.toLocaleString()}거래일 · TQQQ ${usd(DATA.tqqq[L])} · QQQ ${usd(DATA.qqq[L])}`;
+    loadMeta(DATA.iso[L]);
     LIVE = E.signals(DATA.tqqq, DATA.qqq, P);
     $('loading').hidden = true;
 

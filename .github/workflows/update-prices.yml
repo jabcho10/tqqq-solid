@@ -16,8 +16,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install yfinance pandas
+      - run: pip install yfinance pandas requests
       - run: python scripts/update_prices.py
+        env:
+          ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}   # 선택: 저장소 Secrets에 넣으면 출처로 추가됨
       - name: 변경 시 커밋
         run: |
           if git diff --quiet docs/data/prices.csv; then
@@ -25,6 +27,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add docs/data/prices.csv
+          git add docs/data/prices.csv docs/data/meta.json
           git commit -m "시세 갱신 $(tail -1 docs/data/prices.csv | cut -d, -f1)"
           git push

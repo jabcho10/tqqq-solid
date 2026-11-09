@@ -1,0 +1,23 @@
+{
+ "checked_at": "2026-11-09T05:02:06Z",
+ "updated_at": "2026-11-09T05:02:06Z",
+ "last_date": "2026-11-06",
+ "sources": {
+  "yahoo": "ok (30일, ~2026-11-06)",
+  "nasdaq": "ok (30일, ~2026-11-06)",
+  "alphavantage": "실패: ALPHAVANTAGE_KEY 없음 (건너뜀)",
+  "google": "ok (1일, ~2026-11-06)",
+  "cnbc": "ok (1일, ~2026-11-06)"
+ },
+ "rows": [
+  {
+   "date": "2026-11-06",
+   "source": "yahoo",
+   "checked": [
+    "nasdaq",
+    "google",
+    "cnbc"
+   ]
+  }
+ ]
+}

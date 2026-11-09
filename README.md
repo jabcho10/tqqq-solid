@@ -35,6 +35,24 @@ python -m http.server 8000
 
 ## 시세 갱신 규칙
 
-- 엑셀 원본과 같은 수정 전 종가(Close)를 쓴다. 배당은 반영하지 않는다.
+`scripts/update_prices.py` 가 여러 출처에서 종가를 받아 서로 교차 확인한다.
+
+| 출처 | 범위 | 비고 |
+|---|---|---|
+| Yahoo (yfinance) | 여러 날 | 1순위. 분할 정보도 여기서 받음 |
+| Nasdaq.com | 여러 날 | 2순위 |
+| Alpha Vantage | 여러 날 | 저장소 Secrets에 `ALPHAVANTAGE_KEY` 를 넣으면 사용 (무료 키) |
+| Google Finance | 마지막 하루 | 장 마감("Closed") 표시가 있을 때만 |
+| CNBC | 마지막 하루 | 장중이 아닐 때만 |
+
+- 수정 전 종가(Close)를 쓴다. 배당은 반영하지 않는다.
+- 출처마다 기존 CSV와 겹치는 날짜를 대조해, 어긋나는 출처는 버린다.
+- 새 날짜는 우선순위가 가장 높은 출처 값을 쓰고, 다른 출처와 0.5% 넘게 다르면 아무것도 쓰지 않고 실패한다.
+- 하루치 출처(Google, CNBC)만 있는 날짜는 바로 다음 평일일 때만 추가한다.
 - 분할이 생기면 이전 가격을 분할 비율로 나눠 잇는다.
-- 겹치는 날짜의 값이 기존과 다르면 아무것도 바꾸지 않고 워크플로가 실패한다 (Actions 탭에서 확인).
+- 어느 출처로 받았는지는 `docs/data/meta.json` 에 남고 페이지 맨 위에 표시된다.
+
+```
+python scripts/update_prices.py --test-truncate 5      # 끝 5일을 지웠다고 치고 다시 받아 비교 (쓰지 않음)
+PRICE_SOURCES=nasdaq,google python scripts/update_prices.py   # 출처 지정
+```
