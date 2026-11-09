@@ -1,0 +1,30 @@
+name: 시세 갱신
+
+on:
+  schedule:
+    - cron: '30 22 * * 1-5'   # 평일 22:30 UTC (미국 장 마감 후, 한국 07:30)
+  workflow_dispatch:           # Actions 탭에서 수동 실행
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install yfinance pandas
+      - run: python scripts/update_prices.py
+      - name: 변경 시 커밋
+        run: |
+          if git diff --quiet docs/data/prices.csv; then
+            echo "변경 없음"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/prices.csv
+          git commit -m "시세 갱신 $(tail -1 docs/data/prices.csv | cut -d, -f1)"
+          git push
