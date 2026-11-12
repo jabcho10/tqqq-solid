@@ -20,13 +20,19 @@ jobs:
       - run: python scripts/update_prices.py
         env:
           ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}   # 선택: 저장소 Secrets에 넣으면 출처로 추가됨
+      - name: USD 시세 (docs/usd)
+        if: ${{ !cancelled() }}        # TQQQ 갱신이 실패해도 USD는 따로 시도
+        run: python USD/scripts/update_prices.py
+        env:
+          ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
       - name: 변경 시 커밋
+        if: ${{ !cancelled() }}        # 한쪽만 갱신돼도 커밋
         run: |
-          if git diff --quiet docs/data/prices.csv; then
+          if git diff --quiet docs/data/prices.csv docs/usd/data/prices.csv; then
             echo "변경 없음"; exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add docs/data/prices.csv docs/data/meta.json
-          git commit -m "시세 갱신 $(tail -1 docs/data/prices.csv | cut -d, -f1)"
+          git add docs/data/prices.csv docs/data/meta.json docs/usd/data/prices.csv docs/usd/data/meta.json
+          git commit -m "시세 갱신 $(tail -1 docs/data/prices.csv | cut -d, -f1) (USD $(tail -1 docs/usd/data/prices.csv | cut -d, -f1))"
           git push

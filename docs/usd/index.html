@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USD 솔리드 백테스트</title>
+<meta name="description" content="USD(반도체 2배) 솔리드 매매 규칙 백테스트와 다음 거래일 주문 계산기">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css">
+<style>
+:root {
+  --bg: #f6f5f1; --surface: #ffffff; --surface-2: #f0efe9; --border: #e2e0d8; --border-strong: #c9c6bb;
+  --text: #1c1b18; --muted: #6b685f; --faint: #9a968b;
+  --accent: #1f5fd1; --accent-weak: #e6eefc;
+  --pos: #137a4b; --pos-weak: #e3f3ea; --neg: #b8362b; --neg-weak: #fbe8e5; --warn: #9a6400; --warn-weak: #fcf1dc;
+  --s-strategy: #1f5fd1; --s-qqq: #8a877d; --s-tqqq: #d9822b;
+  --radius: 10px; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131312; --surface: #1c1c1a; --surface-2: #252522; --border: #2f2f2b; --border-strong: #45443f;
+    --text: #ecebe6; --muted: #a3a097; --faint: #737067;
+    --accent: #6c9dff; --accent-weak: #1c2a45;
+    --pos: #4cc38a; --pos-weak: #15301f; --neg: #f07a6e; --neg-weak: #3a1d1a; --warn: #e0a84a; --warn-weak: #35280f;
+    --s-strategy: #6c9dff; --s-qqq: #8f8c83; --s-tqqq: #f0a050;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131312; --surface: #1c1c1a; --surface-2: #252522; --border: #2f2f2b; --border-strong: #45443f;
+  --text: #ecebe6; --muted: #a3a097; --faint: #737067;
+  --accent: #6c9dff; --accent-weak: #1c2a45;
+  --pos: #4cc38a; --pos-weak: #15301f; --neg: #f07a6e; --neg-weak: #3a1d1a; --warn: #e0a84a; --warn-weak: #35280f;
+  --s-strategy: #6c9dff; --s-qqq: #8f8c83; --s-tqqq: #f0a050;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 'IBM Plex Sans KR', system-ui, sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 64px; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+h1 { font-size: 26px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 17px; margin: 0 0 14px; }
+.sub { color: var(--muted); font-size: 14px; }
+.sub b { color: var(--text); font-weight: 600; }
+.head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.site-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.site-switch a { padding: 6px 12px; font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; }
+.site-switch a + a { border-left: 1px solid var(--border); }
+.site-switch a[aria-current="page"] { background: var(--accent); color: #fff; }
+.site-switch a:not([aria-current]):hover { color: var(--text); background: var(--surface-2); }
+.theme-btn { border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 22px; overflow-x: auto; }
+nav.tabs button { border: 0; background: none; font: inherit; font-weight: 500; color: var(--muted); padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+nav.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 18px; }
+.panel-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.panel-head h2 { margin: 0; }
+.hint { color: var(--faint); font-size: 13px; }
+
+/* 설정 */
+details.params summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+details.params summary::-webkit-details-marker { display: none; }
+details.params summary .chev { color: var(--muted); font-size: 13px; font-weight: 400; }
+.grid-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px 14px; margin-top: 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12.5px; color: var(--muted); }
+.field input[type=number], .field input[type=date], .field select {
+  font: inherit; font-family: var(--mono); font-size: 14px; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; width: 100%; min-width: 0;
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.field.check { flex-direction: row; align-items: center; gap: 8px; padding-top: 18px; }
+.field.check label { font-size: 14px; color: var(--text); }
+.field.check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.group-title { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 12px; }
+.group-title:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+.btn { font: inherit; font-size: 14px; font-weight: 500; border-radius: 8px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); cursor: pointer; }
+.chip:hover { color: var(--text); border-color: var(--border-strong); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.period { padding: 14px 18px; }
+.period-top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.dates { display: flex; align-items: center; gap: 6px; }
+.dates input { font: inherit; font-family: var(--mono); font-size: 13.5px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; min-width: 0; width: 150px; }
+.dates input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.tilde { color: var(--faint); }
+.years { margin-top: 12px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; display: grid; gap: 8px; }
+.decade { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: start; }
+.decade-label { font-size: 12.5px; color: var(--faint); padding-top: 5px; }
+.decade-years { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 5px; }
+.years .chip { font-family: var(--mono); font-size: 12.5px; padding: 4px 0; text-align: center; background: var(--surface); }
+.years .chip[aria-pressed="true"] { background: var(--accent); }
+.year-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 520px) { .decade { grid-template-columns: 1fr; gap: 4px; } .decade-label { padding-top: 0; } }
+.period-hint { margin: 8px 0 0; font-size: 12.5px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#tblYears tbody tr[data-year] { cursor: pointer; }
+#tblYears tbody tr[data-year]:hover td { filter: brightness(0.96); }
+#tblYears tr[data-year] td:first-child::after { content: ' ▸'; color: var(--faint); font-size: 11px; }
+#tblYears tr.open td:first-child::after { content: ' ▾'; }
+#tblYears tr.open td { border-bottom-color: transparent; }
+#tblYears tr.months > td { padding: 4px 8px 14px; background: var(--surface); white-space: normal; text-align: left; font-family: inherit; }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 5px; }
+.mcell { border-radius: 7px; padding: 6px 8px; background: var(--surface-2); min-width: 0; }
+.mcell.pos { background: var(--pos-weak); } .mcell.neg { background: var(--neg-weak); }
+.mcell .mk { font-size: 11.5px; color: var(--muted); }
+.mcell .mv { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+.mcell.pos .mv { color: var(--pos); } .mcell.neg .mv { color: var(--neg); }
+.mcell .ms { font-family: var(--mono); font-size: 11px; color: var(--faint); line-height: 1.35; }
+.mcell.empty { background: transparent; border: 1px dashed var(--border); }
+.msum { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+#tblWorst td { vertical-align: top; }
+#tblWorst td:last-child { font-size: 15px; font-weight: 500; }
+.rank { display: inline-block; width: 20px; color: var(--faint); font-family: 'IBM Plex Sans KR', sans-serif; }
+.wmeta { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; color: var(--faint); margin: 3px 0 0 20px; white-space: normal; }
+@media (max-width: 560px) {
+  #tblYears th:nth-child(3), #tblYears td:nth-child(3) { display: none; }
+  #tblYears th, #tblYears td { padding: 7px 6px; }
+  .mgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.exit-tag { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-family: 'IBM Plex Sans KR', sans-serif; }
+.exit-tag.ts { background: var(--neg-weak); color: var(--neg); }
+#tblYears tbody tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+@media (max-width: 520px) { .dates { width: 100%; } .dates input { flex: 1; width: auto; } }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+@media (min-width: 760px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 14px; min-width: 0; }
+.kpi .k { font-size: 12.5px; color: var(--muted); }
+.kpi .v { font-family: var(--mono); font-size: 22px; font-weight: 500; margin-top: 2px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .d { font-size: 12px; color: var(--faint); margin-top: 1px; }
+.kpi.hero .v { font-size: 28px; }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+
+/* 차트 */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ''; display: inline-block; width: 12px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+.chart { width: 100%; min-height: 120px; }
+.uplot, .uplot * { font-family: 'IBM Plex Sans KR', system-ui, sans-serif; }
+.u-legend { display: none; }
+.readout { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 1.6em; }
+
+/* 표 */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; }
+td { font-family: var(--mono); font-size: 13.5px; }
+td.txt { font-family: inherit; }
+td.why { text-align: left; white-space: normal; min-width: 220px; }
+tr:last-child td { border-bottom: 0; }
+.cell-pos { background: var(--pos-weak); color: var(--pos); }
+.cell-neg { background: var(--neg-weak); color: var(--neg); }
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.two-col > *, .calc-grid > * { min-width: 0; }
+@media (min-width: 900px) { .two-col { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); } }
+
+/* 계산기 */
+.calc-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+@media (min-width: 960px) { .calc-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); } }
+.market { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.market div { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.market .k { font-size: 12px; color: var(--muted); }
+.market .v { font-family: var(--mono); font-size: 15px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.badge.on { background: var(--warn-weak); color: var(--warn); }
+.badge.off { background: var(--pos-weak); color: var(--pos); }
+.badge.buy { background: var(--accent-weak); color: var(--accent); }
+.badge.sell { background: var(--neg-weak); color: var(--neg); }
+.note { background: var(--warn-weak); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; margin: 10px 0 0; }
+.note.info { background: var(--accent-weak); color: var(--accent); }
+.fillbox { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-weak); }
+.fillbox.editing { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn-weak); }
+.journal { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.jrow { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.jrow:last-child { border-bottom: 0; }
+.jrow .jd { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.jrow .jt { min-width: 0; }
+.jrow .jt .tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--surface-2); color: var(--faint); margin-right: 4px; }
+.jrow .jt .tag.set { background: var(--warn-weak); color: var(--warn); }
+.jrow .jt .none { color: var(--faint); }
+.jrow .jb { display: flex; gap: 4px; }
+.jrow.editing { background: var(--warn-weak); }
+.jrow .btn.small { padding: 3px 9px; font-size: 12px; }
+.legacy { margin-top: 10px; font-size: 13px; color: var(--muted); }
+@media (max-width: 520px) { .jrow { grid-template-columns: 1fr auto; } .jrow .jt { grid-column: 1 / -1; grid-row: 2; } }
+.fill-help { margin: -4px 0 10px; }
+table.fill td, table.fill th { vertical-align: middle; }
+table.fill input[type=number] { font: inherit; font-family: var(--mono); font-size: 13.5px; width: 96px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); text-align: right; }
+table.fill input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); vertical-align: middle; }
+table.fill tr.grp td { background: var(--surface-2); font-family: inherit; font-weight: 600; font-size: 12.5px; color: var(--muted); text-align: left; }
+table.fill tr.off td:not(:first-child) { opacity: .45; }
+table.fill .rule { font-size: 12px; }
+table.fill th:nth-child(2), table.fill td:nth-child(2) { text-align: left; white-space: normal; }
+table.fill th:nth-child(3), table.fill th:nth-child(4) { width: 120px; }
+@media (max-width: 600px) {
+  table.fill th, table.fill td { padding: 7px 4px; }
+  table.fill th:nth-child(3), table.fill th:nth-child(4) { width: 76px; }
+  table.fill input[type=number] { width: 70px; padding: 5px 5px; font-size: 13px; }
+  .sec .grid-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .sec .field label { font-size: 12px; }
+}
+.sec { padding: 14px 0; border-top: 1px solid var(--border); }
+.sec:first-of-type { border-top: 0; padding-top: 0; }
+.sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.sec-head h3 { font-size: 15px; margin: 0; }
+.sec .grid-form { margin-top: 0; }
+.sec .row-btns { margin-top: 12px; }
+.dirty { font-size: 12px; font-weight: 600; color: var(--warn); background: var(--warn-weak); padding: 2px 8px; border-radius: 999px; }
+#calcNotes .note { margin: 0 0 12px; }
+.status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+@media (min-width: 760px) { .status { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.st { border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; min-width: 0; }
+.st .k { font-size: 12px; color: var(--muted); }
+.st .v { font-family: var(--mono); font-size: 19px; font-weight: 500; margin-top: 2px; white-space: nowrap; }
+.st .v small { font-size: 13px; color: var(--faint); font-weight: 400; }
+.st .d { font-size: 12px; color: var(--faint); margin-top: 3px; }
+.st.on { background: var(--warn-weak); border-color: transparent; } .st.on .v { color: var(--warn); }
+.st.off .v { color: var(--pos); }
+.bar { height: 5px; border-radius: 3px; background: var(--surface-2); margin-top: 7px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.bar.warn i { background: var(--warn); } .bar.full i { background: var(--neg); }
+.market { margin-bottom: 4px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 760px) { .market { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.market div { padding: 7px 10px; } .market .v { font-size: 14px; }
+.st .v.word { font-family: inherit; font-weight: 600; }
+.why-m { display: none; font-size: 12px; margin-top: 3px; white-space: normal; }
+@media (max-width: 700px) {
+  .engine table.orders { min-width: 0; table-layout: auto; }
+  .engine table.orders colgroup { display: none; }
+  .engine table.orders th:nth-child(5), .engine table.orders td:nth-child(5), .engine table.orders th:nth-child(6), .engine table.orders td:nth-child(6) { display: none; }
+  .engine table.orders th, .engine table.orders td { padding: 8px 6px; }
+  .engine table.orders td:first-child { white-space: normal; }
+  .why-m { display: block; }
+}
+.engine { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.engine h3 { font-size: 15px; margin: 0 0 8px; }
+table.orders { table-layout: fixed; min-width: 640px; }
+table.orders col.c-name { width: 24%; } table.orders col.c-kind { width: 8%; } table.orders col.c-px { width: 12%; }
+table.orders col.c-qty { width: 9%; } table.orders col.c-amt { width: 16%; } table.orders col.c-why { width: 31%; }
+table.orders td.why { min-width: 0; }
+table.orders td.empty-row { text-align: left; font-family: inherit; color: var(--faint); white-space: normal; }
+.log { max-height: 260px; overflow: auto; font-family: var(--mono); font-size: 12.5px; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin-top: 10px; white-space: pre-wrap; }
+.empty { color: var(--faint); font-size: 14px; padding: 8px 0; }
+footer { color: var(--faint); font-size: 12.5px; margin-top: 30px; line-height: 1.7; }
+footer a, .sub a { color: var(--muted); }
+[hidden] { display: none !important; }
+.loading { color: var(--muted); padding: 60px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>USD 솔리드 백테스트</h1>
+      <div class="sub" id="dataInfo">시세 불러오는 중…</div>
+    </div>
+    <div class="head-right">
+      <nav class="site-switch" aria-label="종목 바꾸기"><a href="../">TQQQ</a><a href="./" aria-current="page">USD</a></nav>
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="화면 테마 바꾸기">테마: 자동</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="bt">백테스트</button>
+    <button role="tab" aria-selected="false" data-tab="calc">주문 계산기</button>
+  </nav>
+
+  <div id="loading" class="loading">시세 데이터를 불러오는 중…</div>
+
+  <!-- ───────────── 백테스트 ───────────── -->
+  <section id="tab-bt" hidden>
+    <div class="panel period">
+      <div class="period-top">
+        <div class="chips" id="presets" role="group" aria-label="빠른 기간 선택">
+          <button type="button" class="chip" data-preset="all">전체 (2002-07~, 합성 포함)</button>
+          <button type="button" class="chip" data-preset="2007">2007-02~ (실제 USD)</button>
+          <button type="button" class="chip" data-preset="2010">2010~</button>
+          <button type="button" class="chip" data-preset="y10">최근 10년</button>
+          <button type="button" class="chip" data-preset="y5">최근 5년</button>
+          <button type="button" class="chip" data-preset="y3">최근 3년</button>
+          <button type="button" class="chip" data-preset="ytd">올해</button>
+          <button type="button" class="chip year-toggle" id="yearToggle" aria-expanded="false" aria-controls="yearChips">연도 선택 ▾</button>
+        </div>
+        <div class="dates">
+          <label class="sr" for="p_start">시작일</label><input type="date" id="p_start">
+          <span class="tilde">~</span>
+          <label class="sr" for="p_end">종료일</label><input type="date" id="p_end" title="비우면 최신">
+        </div>
+      </div>
+      <div class="years" id="yearChips" role="group" aria-label="연도 선택" hidden></div>
+      <p class="hint period-hint">기간을 바꾸면 그 시작일에 보유 없이 새로 시작합니다. 그래서 한 해만 고른 결과는 아래 연도별 표(이전 해 보유분이 이어짐)와 조금 다를 수 있습니다.</p>
+    </div>
+
+    <div class="panel">
+      <details class="params" id="paramBox">
+        <summary><span>규칙 설정 <span class="hint" id="paramSummary"></span></span><span class="chev">펼치기 ▾</span></summary>
+        <form id="paramForm" autocomplete="off">
+          <div class="grid-form">
+            <div class="group-title">메인 엔진</div>
+            <div class="field"><label for="p_init_ratio">첫 매수 (총자산 %)</label><input type="number" id="p_init_ratio" step="1" min="1" max="100"></div>
+            <div class="field"><label for="p_add_ratio">추가 매수 (산 금액 %)</label><input type="number" id="p_add_ratio" step="1" min="1" max="200"></div>
+            <div class="field"><label for="p_b1">매수1 (전날 종가 대비 %)</label><input type="number" id="p_b1" step="0.1"></div>
+            <div class="field"><label for="p_b2">매수2 (전날 종가 대비 %)</label><input type="number" id="p_b2" step="0.5"></div>
+            <div class="field"><label for="p_max_buys">최대 매수 횟수 (첫 매수 포함)</label><input type="number" id="p_max_buys" step="1" min="1" max="20"></div>
+            <div class="field"><label for="p_take_profit">매도 목표 (마지막 매수가 +%)</label><input type="number" id="p_take_profit" step="0.5"></div>
+            <div class="field"><label for="p_time_stop">시간 손절 (거래일)</label><input type="number" id="p_time_stop" step="1" min="1"></div>
+
+            <div class="group-title">RSI 엔진</div>
+            <div class="field check"><input type="checkbox" id="p_use_rsi"><label for="p_use_rsi">RSI 엔진 사용</label></div>
+            <div class="field"><label for="p_rsi_ratio">RSI 자금 (사이클 기준 자산 %)</label><input type="number" id="p_rsi_ratio" step="1" min="0"></div>
+            <div class="field"><label for="p_rsi_buy">RSI 매수 목표</label><input type="number" id="p_rsi_buy" step="1"></div>
+            <div class="field"><label for="p_rsi_sell">RSI 매도 목표</label><input type="number" id="p_rsi_sell" step="1"></div>
+            <div class="field"><label for="p_rsi_hold">RSI 보유 한도 (거래일)</label><input type="number" id="p_rsi_hold" step="1" min="1"></div>
+
+            <div class="group-title">투입 상한 · 비용</div>
+            <div class="field"><label for="p_cap">총 투입 상한 (총자산 %)</label><input type="number" id="p_cap" step="5" min="1" max="100"></div>
+            <div class="field"><label for="p_fee">수수료 (매수·매도 각 %)</label><input type="number" id="p_fee" step="0.01" min="0"></div>
+          </div>
+          <div class="row-btns">
+            <button type="submit" class="btn primary">다시 계산</button>
+            <button type="button" class="btn" id="resetBtn">문서 규칙으로 되돌리기</button>
+            <span class="hint" id="runTime"></span>
+          </div>
+        </form>
+      </details>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>자산 곡선 <span class="hint" id="eqScale">(시작 = 1, 로그 눈금)</span></h2>
+        <div class="legend">
+          <span style="--c: var(--s-strategy)">이 전략</span>
+          <span style="--c: var(--s-qqq)">반도체 1배 지수</span>
+          <span style="--c: var(--s-tqqq)">USD 보유</span>
+        </div>
+      </div>
+      <div class="readout" id="readout1">&nbsp;</div>
+      <div class="chart" id="chartEq"></div>
+      <div class="panel-head" style="margin-top: 18px;">
+        <h2>낙폭 <span class="hint">(전고점 대비)</span></h2>
+        <div class="legend">
+          <span style="--c: var(--s-strategy)">이 전략</span>
+          <span style="--c: var(--s-tqqq)">USD 보유</span>
+        </div>
+      </div>
+      <div class="chart" id="chartDD"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <h2>기간별 CAGR</h2>
+        <div class="table-wrap"><table id="tblPeriods"></table></div>
+        <h2 style="margin-top: 22px;">사이클</h2>
+        <div class="table-wrap"><table id="tblCycles"></table></div>
+        <h2 style="margin-top: 22px;">최악의 사이클 3개 <span class="hint">(계좌 대비, 이 기간 안)</span></h2>
+        <div class="table-wrap"><table id="tblWorst"></table></div>
+      </div>
+      <div class="panel">
+        <h2>연도별 수익률 <span class="hint">(연도를 누르면 월별 수익률)</span></h2>
+        <div class="table-wrap" style="max-height: 640px;"><table id="tblYears"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────── 주문 계산기 ───────────── -->
+  <section id="tab-calc" hidden>
+    <div class="panel fillbox" id="fillBox" hidden>
+      <div class="panel-head">
+        <h2>체결 입력 <span class="hint" id="fillTitle"></span></h2>
+        <span class="hint" id="fillPending"></span>
+      </div>
+      <p class="hint fill-help" id="fillHelp">그날 낸 주문입니다. 종가로 계산한 체결 여부를 미리 체크해 두었으니, 실제와 다른 것만 고치고 「체결 반영」을 누르세요. 예수금은 수수료 0.07%를 가정해 계산합니다.</p>
+      <div class="table-wrap"><table class="fill" id="tblFill"></table></div>
+      <div class="row-btns">
+        <button type="button" class="btn primary" id="fillApply">체결 반영</button>
+        <button type="button" class="btn" id="rollBtn">남은 거래일 모두 규칙대로 진행</button>
+        <button type="button" class="btn" id="fillCancel" hidden>수정 취소</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>다음 거래일 주문</h2>
+        <span class="hint" id="calcBasis"></span>
+      </div>
+      <div id="calcNotes"></div>
+      <div class="status" id="status"></div>
+      <div class="market" id="market"></div>
+      <div class="engine">
+        <h3>메인 엔진 <span class="hint" id="mainSub"></span></h3>
+        <div class="table-wrap"><table class="orders" id="tblMain"></table></div>
+      </div>
+      <div class="engine">
+        <h3>RSI 엔진 <span class="hint" id="rsiSub"></span></h3>
+        <div class="table-wrap"><table class="orders" id="tblRsi"></table></div>
+      </div>
+    </div>
+
+    <div class="calc-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>내 계좌 상태</h2>
+          <span class="hint">이 브라우저에만 저장 · 칸마다 따로 저장</span>
+        </div>
+
+        <form class="sec" id="form_acct" autocomplete="off">
+          <div class="sec-head"><h3>계좌</h3><span class="dirty" id="dirty_acct" hidden>저장 안 됨</span></div>
+          <div class="grid-form">
+            <div class="field"><label for="s_asof">상태 기준일 (이 날 종가 반영 후)</label><input type="date" id="s_asof"></div>
+            <div class="field"><label for="s_cash">예수금 ($)</label><input type="number" id="s_cash" step="0.01" min="0"></div>
+          </div>
+          <div class="row-btns"><button type="submit" class="btn primary small">계좌 저장</button></div>
+        </form>
+
+        <form class="sec" id="form_main" autocomplete="off">
+          <div class="sec-head"><h3>메인 사이클</h3><span class="dirty" id="dirty_main" hidden>저장 안 됨</span></div>
+          <div class="grid-form">
+            <div class="field"><label for="s_shares">보유 수량</label><input type="number" id="s_shares" step="1" min="0"></div>
+            <div class="field"><label for="s_invested">지금까지 산 금액 ($)</label><input type="number" id="s_invested" step="0.01" min="0"></div>
+            <div class="field"><label for="s_last_buy">마지막 매수가 ($)</label><input type="number" id="s_last_buy" step="0.01" min="0"></div>
+            <div class="field"><label for="s_adds">추가 매수 횟수 (첫 매수 제외)</label><input type="number" id="s_adds" step="1" min="0"></div>
+            <div class="field"><label for="s_day">사이클 진행일 (첫 매수일 0)</label><input type="number" id="s_day" step="1" min="0"></div>
+            <div class="field"><label for="s_cyc_equity">사이클 기준 자산 ($)</label><input type="number" id="s_cyc_equity" step="0.01" min="0"></div>
+          </div>
+          <div class="row-btns">
+            <button type="submit" class="btn primary small">메인 저장</button>
+            <button type="button" class="btn small" data-reset="main">보유 없음으로 초기화</button>
+          </div>
+        </form>
+
+        <form class="sec" id="form_rsi" autocomplete="off">
+          <div class="sec-head"><h3>RSI 사이클</h3><span class="dirty" id="dirty_rsi" hidden>저장 안 됨</span></div>
+          <div class="grid-form">
+            <div class="field"><label for="s_rsi_shares">보유 수량</label><input type="number" id="s_rsi_shares" step="1" min="0"></div>
+            <div class="field"><label for="s_rsi_buys">매수 횟수</label><input type="number" id="s_rsi_buys" step="1" min="0" max="2"></div>
+            <div class="field"><label for="s_rsi_day">진행일 (첫 매수일 0)</label><input type="number" id="s_rsi_day" step="1" min="0"></div>
+          </div>
+          <div class="row-btns">
+            <button type="submit" class="btn primary small">RSI 저장</button>
+            <button type="button" class="btn small" data-reset="rsi">보유 없음으로 초기화</button>
+          </div>
+        </form>
+        <p class="hint" style="margin: 12px 0 0;">값을 고치면 위 주문은 바로 다시 계산되지만, 저장을 눌러야 다음에 열 때도 남습니다.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>새 계좌로 시작</h2></div>
+        <div class="grid-form" style="margin-top: 0;">
+          <div class="field"><label for="n_cash">투자금 ($)</label><input type="number" id="n_cash" step="100" min="0" value="10000"></div>
+        </div>
+        <div class="row-btns"><button type="button" class="btn" id="newBtn">계좌·메인·RSI 모두 초기화</button></div>
+        <h2 style="margin-top: 24px;">체결 기록 <span class="hint">「수정」으로 지난 체결을 고칠 수 있음</span></h2>
+        <div class="journal" id="journal"></div>
+        <details class="legacy" id="legacyBox" hidden><summary>이전 버전 기록 (수정 불가)</summary><div class="log" id="legacyLog"></div></details>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    규칙: USD 솔리드 규칙서 (첫 매수 25%, 추가 매수 산 금액의 25% · 첫 매수 포함 8회, 마지막 매수가 +4.5% 전량 매도, 24거래일 MOC, 반도체 1배 지수 RSI(2) 보조 엔진, 총 투입 상한 60%, 모멘텀 필터 없음).<br>
+    신호 지수는 USD 일간 수익률 ÷ 2 를 누적한 대용 지수입니다. 2007-02 이전 USD는 합성 SOXL에서 역산한 2차 합성값입니다. 종가 100% 체결을 가정하고 현금 이자는 넣지 않았습니다.<br>
+    과거 데이터 기반 백테스트이며 미래 수익을 보장하지 않습니다. 투자 자문이 아니며, 투자 판단과 책임은 본인에게 있습니다.
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.iife.min.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

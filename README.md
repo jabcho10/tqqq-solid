@@ -7,6 +7,7 @@
 | 경로 | 내용 |
 |---|---|
 | `docs/` | GitHub Pages 사이트 (백테스트 + 주문 계산기). 브라우저에서 계산 |
+| `docs/usd/` | USD(반도체 2배) 솔리드 사이트. 규칙·스크립트는 [USD/README.md](USD/README.md) |
 | `docs/engine.js` | 매매 엔진 (solid.py 와 같은 로직, 결과 일치 검증함) |
 | `docs/data/prices.csv` | 일별 종가 (date, tqqq, qqq). 2010년 이전 TQQQ는 합성 |
 | `scripts/update_prices.py` | Yahoo Finance에서 최신 종가를 받아 CSV에 추가 |
@@ -19,11 +20,11 @@
 
 ## GitHub Pages 배포
 
-- 페이지: https://jabcho10.github.io/tqqq-solid/
+- 페이지: https://jabcho10.github.io/tqqq-solid/ (USD: https://jabcho10.github.io/tqqq-solid/usd/)
 - Pages 설정: `main` 브랜치 `/docs` 폴더
 - 시세를 바로 갱신하려면 **Actions → 시세 갱신 → Run workflow**
 
-이후 평일마다 자동으로 `docs/data/prices.csv` 가 갱신·커밋되고, Pages가 다시 배포된다.
+이후 평일마다 자동으로 `docs/data/prices.csv` 와 `docs/usd/data/prices.csv` 가 갱신·커밋되고, Pages가 다시 배포된다. 한쪽 갱신이 실패해도 다른 쪽은 따로 시도한다.
 
 ## 로컬에서 보기
 
