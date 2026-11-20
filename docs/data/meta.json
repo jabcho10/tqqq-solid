@@ -1,13 +1,13 @@
 {
- "checked_at": "2026-11-19T03:43:32Z",
- "updated_at": "2026-11-19T03:43:32Z",
- "last_date": "2026-11-18",
+ "checked_at": "2026-11-20T03:37:15Z",
+ "updated_at": "2026-11-20T03:37:15Z",
+ "last_date": "2026-11-19",
  "sources": {
-  "yahoo": "ok (30일, ~2026-11-18)",
-  "nasdaq": "ok (30일, ~2026-11-18)",
+  "yahoo": "ok (30일, ~2026-11-19)",
+  "nasdaq": "ok (30일, ~2026-11-19)",
   "alphavantage": "실패: ALPHAVANTAGE_KEY 없음 (건너뜀)",
-  "google": "ok (1일, ~2026-11-18)",
-  "cnbc": "ok (1일, ~2026-11-18)"
+  "google": "ok (1일, ~2026-11-19)",
+  "cnbc": "ok (1일, ~2026-11-19)"
  },
  "rows": [
   {
@@ -84,6 +84,15 @@
   },
   {
    "date": "2026-11-18",
+   "source": "yahoo",
+   "checked": [
+    "nasdaq",
+    "google",
+    "cnbc"
+   ]
+  },
+  {
+   "date": "2026-11-19",
    "source": "yahoo",
    "checked": [
     "nasdaq",
