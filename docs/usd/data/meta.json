@@ -1,12 +1,12 @@
 {
- "checked_at": "2026-11-26T04:14:38Z",
- "last_date": "2026-11-25",
+ "checked_at": "2026-11-28T04:02:46Z",
+ "last_date": "2026-11-27",
  "sources": {
-  "yahoo": "ok (30일, ~2026-11-25)",
-  "nasdaq": "ok (30일, ~2026-11-25)",
+  "yahoo": "ok (30일, ~2026-11-27)",
+  "nasdaq": "ok (29일, ~2026-11-25)",
   "alphavantage": "실패: ALPHAVANTAGE_KEY 없음 (건너뜀)",
   "google": "실패: USD 마감 종가를 찾지 못함 (장중이거나 페이지 구조 변경)",
-  "cnbc": "ok (1일, ~2026-11-25)"
+  "cnbc": "ok (1일, ~2026-11-27)"
  },
  "rows": [
   {
@@ -110,7 +110,14 @@
     "nasdaq",
     "cnbc"
    ]
+  },
+  {
+   "date": "2026-11-27",
+   "source": "yahoo",
+   "checked": [
+    "cnbc"
+   ]
   }
  ],
- "updated_at": "2026-11-26T04:14:38Z"
+ "updated_at": "2026-11-28T04:02:46Z"
 }
